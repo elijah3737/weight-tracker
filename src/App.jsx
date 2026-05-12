@@ -2,16 +2,12 @@ import { useState, useEffect } from 'react';
 import Today from './screens/Today';
 import Month from './screens/Month';
 import Progress from './screens/Progress';
-import Chat from './screens/Chat';
-import Settings from './screens/Settings';
 import { initTelegram, isTelegram, getTelegramUser } from './lib/telegram';
 
 const tabs = [
   { id: 'today', label: 'Сегодня', icon: '📋' },
   { id: 'month', label: 'Месяц', icon: '📅' },
   { id: 'progress', label: 'Прогресс', icon: '📈' },
-  { id: 'chat', label: 'AI Чат', icon: '🤖' },
-  { id: 'settings', label: 'Настройки', icon: '⚙️' },
 ];
 
 export default function App() {
@@ -43,8 +39,6 @@ export default function App() {
           {tab === 'today' && <Today />}
           {tab === 'month' && <Month />}
           {tab === 'progress' && <Progress />}
-          {tab === 'chat' && <Chat onGoSettings={() => setTab('settings')} />}
-          {tab === 'settings' && <Settings />}
         </div>
 
         {/* Bottom nav */}
