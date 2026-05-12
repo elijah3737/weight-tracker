@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Today from './screens/Today';
 import Month from './screens/Month';
 import Progress from './screens/Progress';
 import Chat from './screens/Chat';
 import Settings from './screens/Settings';
+import { initTelegram, isTelegram, getTelegramUser } from './lib/telegram';
 
 const tabs = [
   { id: 'today', label: 'Сегодня', icon: '📋' },
@@ -15,16 +16,27 @@ const tabs = [
 
 export default function App() {
   const [tab, setTab] = useState('today');
+  const [tgUser, setTgUser] = useState(null);
+
+  useEffect(() => {
+    initTelegram();
+    const user = getTelegramUser();
+    if (user) setTgUser(user);
+  }, []);
+
+  const userName = tgUser?.first_name ?? 'Аня';
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
       <div className="w-full max-w-sm bg-gray-100 relative">
-        {/* Status bar */}
-        <div className="bg-white px-4 pt-3 pb-2 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-          <span className="text-xs text-gray-400">9:41</span>
-          <span className="text-sm font-semibold text-gray-700">AI Трекер похудения</span>
-          <span className="text-xs text-gray-400">⚡ 87%</span>
-        </div>
+        {/* Status bar — скрываем внутри Telegram (там своя шапка) */}
+        {!isTelegram() && (
+          <div className="bg-white px-4 pt-3 pb-2 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+            <span className="text-xs text-gray-400">9:41</span>
+            <span className="text-sm font-semibold text-gray-700">fit+ трекер</span>
+            <span className="text-xs text-gray-400">⚡ 87%</span>
+          </div>
+        )}
 
         {/* Content */}
         <div className={tab === 'chat' ? '' : 'overflow-y-auto'} style={tab === 'chat' ? {} : { height: 'calc(100dvh - 104px)' }}>
