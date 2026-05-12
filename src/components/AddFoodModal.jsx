@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, ChevronDown, ChevronUp, Plus, Minus } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Plus, Minus, Sparkles, AlertCircle } from 'lucide-react';
+import { chat, FOOD_PARSE_PROMPT, isConfigured } from '../lib/ollama';
 
 const QUICK_FOODS = [
   { name: 'Овсянка на молоке (200г)', kcal: 180, protein: 7, fat: 5, carbs: 28 },
@@ -20,7 +21,11 @@ export default function AddFoodModal({ onClose, onAdd }) {
   const [query, setQuery] = useState('');
   const [form, setForm] = useState(EMPTY);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [tab, setTab] = useState('quick'); // 'quick' | 'manual'
+  const [tab, setTab] = useState('quick'); // 'quick' | 'manual' | 'ai'
+  const [aiText, setAiText] = useState('');
+  const [aiParsing, setAiParsing] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiResult, setAiResult] = useState(null); // parsed items
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -54,6 +59,50 @@ export default function AddFoodModal({ onClose, onAdd }) {
     onClose();
   };
 
+  const parseWithAI = async () => {
+    if (!aiText.trim()) return;
+    setAiParsing(true);
+    setAiError('');
+    setAiResult(null);
+    try {
+      const raw = await chat([
+        { role: 'system', content: FOOD_PARSE_PROMPT },
+        { role: 'user', content: aiText },
+      ]);
+      const jsonStr = raw.match(/\{[\s\S]*\}/)?.[0];
+      if (!jsonStr) throw new Error('AI вернул некорректный ответ');
+      const parsed = JSON.parse(jsonStr);
+      setAiResult(parsed);
+    } catch (e) {
+      setAiError(e.message);
+    } finally {
+      setAiParsing(false);
+    }
+  };
+
+  const confirmAiItem = (item) => {
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    onAdd({ id: Date.now(), time, name: item.name, kcal: item.kcal, protein: item.protein, fat: item.fat, carbs: item.carbs, source: 'text' });
+  };
+
+  const confirmAllAi = () => {
+    if (!aiResult?.items?.length) return;
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const combined = {
+      id: Date.now(), time,
+      name: aiResult.items.map(i => i.name).join(', '),
+      kcal: aiResult.total?.kcal || aiResult.items.reduce((s, i) => s + i.kcal, 0),
+      protein: aiResult.total?.protein || aiResult.items.reduce((s, i) => s + i.protein, 0),
+      fat: aiResult.total?.fat || aiResult.items.reduce((s, i) => s + i.fat, 0),
+      carbs: aiResult.total?.carbs || aiResult.items.reduce((s, i) => s + i.carbs, 0),
+      source: 'text',
+    };
+    onAdd(combined);
+    onClose();
+  };
+
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
 
   const adjust = (field, delta) => {
@@ -82,7 +131,7 @@ export default function AddFoodModal({ onClose, onAdd }) {
 
         {/* Tabs */}
         <div className="flex mx-4 mt-3 mb-3 bg-gray-100 rounded-xl p-1">
-          {[['quick', '🔍 Быстрый выбор'], ['manual', '✏️ Вручную']].map(([id, label]) => (
+          {[['quick', '🔍 Быстрый'], ['manual', '✏️ Вручную'], ...(isConfigured() ? [['ai', '✨ AI']] : [])].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -229,6 +278,78 @@ export default function AddFoodModal({ onClose, onAdd }) {
               >
                 Добавить
               </button>
+            </div>
+          )}
+
+          {tab === 'ai' && (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-400">Напиши что ел в свободной форме — AI распознает блюда и посчитает КБЖУ</p>
+              <textarea
+                ref={inputRef}
+                rows={3}
+                placeholder="Например: съела овсянку на молоке с бананом и выпила кофе с молоком"
+                value={aiText}
+                onChange={e => setAiText(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-purple-400 resize-none"
+              />
+              <button
+                onClick={parseWithAI}
+                disabled={!aiText.trim() || aiParsing}
+                className={`w-full py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                  aiText.trim() && !aiParsing
+                    ? 'bg-purple-500 text-white hover:bg-purple-600 shadow-lg shadow-purple-200'
+                    : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                }`}
+              >
+                <Sparkles size={16} />
+                {aiParsing ? 'Анализирую...' : 'Распознать через AI'}
+              </button>
+
+              {aiError && (
+                <div className="flex items-start gap-2 bg-red-50 rounded-xl px-3 py-2.5 text-sm text-red-600">
+                  <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                  {aiError}
+                </div>
+              )}
+
+              {aiResult?.items?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Распознано:</p>
+                  <div className="space-y-2 mb-3">
+                    {aiResult.items.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5">
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">{item.name}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            Б {item.protein}г · Ж {item.fat}г · У {item.carbs}г
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-orange-500">{item.kcal} ккал</span>
+                          <button
+                            onClick={() => { confirmAiItem(item); onClose(); }}
+                            className="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center"
+                          >
+                            <Plus size={14} className="text-purple-600" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {aiResult.total && (
+                    <div className="bg-orange-50 rounded-xl px-3 py-2 text-sm mb-3">
+                      <span className="font-bold text-orange-500">Итого: {aiResult.total.kcal} ккал</span>
+                      <span className="text-gray-400 ml-2 text-xs">Б {aiResult.total.protein}г · Ж {aiResult.total.fat}г · У {aiResult.total.carbs}г</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={confirmAllAi}
+                    className="w-full py-3 rounded-2xl bg-purple-500 text-white text-sm font-bold hover:bg-purple-600 transition-colors"
+                  >
+                    ✅ Добавить всё одним приёмом
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

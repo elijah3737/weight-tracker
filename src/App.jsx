@@ -2,11 +2,15 @@ import { useState } from 'react';
 import Today from './screens/Today';
 import Month from './screens/Month';
 import Progress from './screens/Progress';
+import Chat from './screens/Chat';
+import Settings from './screens/Settings';
 
 const tabs = [
   { id: 'today', label: 'Сегодня', icon: '📋' },
   { id: 'month', label: 'Месяц', icon: '📅' },
   { id: 'progress', label: 'Прогресс', icon: '📈' },
+  { id: 'chat', label: 'AI Чат', icon: '🤖' },
+  { id: 'settings', label: 'Настройки', icon: '⚙️' },
 ];
 
 export default function App() {
@@ -23,10 +27,12 @@ export default function App() {
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto" style={{ height: 'calc(100dvh - 104px)' }}>
+        <div className={tab === 'chat' ? '' : 'overflow-y-auto'} style={tab === 'chat' ? {} : { height: 'calc(100dvh - 104px)' }}>
           {tab === 'today' && <Today />}
           {tab === 'month' && <Month />}
           {tab === 'progress' && <Progress />}
+          {tab === 'chat' && <Chat onGoSettings={() => setTab('settings')} />}
+          {tab === 'settings' && <Settings />}
         </div>
 
         {/* Bottom nav */}
@@ -35,13 +41,13 @@ export default function App() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex-1 flex flex-col items-center py-3 gap-0.5 transition-colors ${
+              className={`flex-1 flex flex-col items-center py-2 gap-0.5 transition-colors ${
                 tab === t.id ? 'text-purple-600' : 'text-gray-400'
               }`}
             >
-              <span className="text-lg">{t.icon}</span>
-              <span className="text-xs font-medium">{t.label}</span>
-              {tab === t.id && <div className="w-1 h-1 rounded-full bg-purple-500 mt-0.5" />}
+              <span className="text-base">{t.icon}</span>
+              <span className="text-[10px] font-medium leading-tight">{t.label}</span>
+              {tab === t.id && <div className="w-1 h-1 rounded-full bg-purple-500" />}
             </button>
           ))}
         </div>
